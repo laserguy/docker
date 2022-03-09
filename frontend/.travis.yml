@@ -1,0 +1,10 @@
+language: generic    # Added due to change in Jest library
+sudo: required       # This means that you need root permission to run this
+services:
+  - docker           # Travis needs copy of docker service running.
+
+before_install:      # Series of steps to do before running test steps
+  - docker build -t mahtovivek741/frontend - f Dockerfile.dev .
+
+script:     
+  - docker run -e CI=true mahtovivek741/frontend npm run test
