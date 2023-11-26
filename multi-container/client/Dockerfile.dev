@@ -1,0 +1,11 @@
+FROM node:14-alpine
+
+WORKDIR "/usr/app"
+
+COPY package.json .
+# --no-package-lock is added to resolve the issue cb() never called
+RUN npm install
+
+COPY . .
+
+CMD ["npm","run","start"]

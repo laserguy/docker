@@ -1,0 +1,73 @@
+#################################################################################################################################################
+# ORCHESTRATION OF ALL THE SERVICES
+# We are creating  web service which will output a nth fibonacci number given input n on the console
+# We are doing this in extremely complicated way just to learn docker with multiple containers
+# We have multiple services here, each of them will be running on the docker container, description of each one is below
+# NGINX SERVER: Although we are not deploying in the production environment yet but here we need NGINX server for the routing
+# EXPRESS SERVER: Any API call to the backend(worker etc), will go through this server(We have named it as api in this file)
+# REACT SERVER: To show UI on the browser, this is named as client
+# REDIS: We will use in the in memory store to do the dynamic programming here, to calculate the further fibonacci numbers
+# POSTGRES: This will just store the numbers for which we already calculated on fibbonaci number
+# WORKER: This has the logic to calculate the fibonacci number.
+
+# So how all these services are connected?
+# All the request will come on the Nginx server, whose soul purpose is to route the request, all the request of rendring UI will go to react server
+# and all the request of backend call will go to express server.
+# Express server is connected to all the other components 
+
+#################################################################################################################################################
+
+
+version: '3'
+services:
+  postgres:
+    image: 'postgres:latest'
+    environment:
+      - POSTGRES_PASSWORD=postgres_password     # Needs password to start the startup command when container is launched
+  redis:
+    image: 'redis:latest'
+  api:   # This is the express server (The server folder we created), since nginx default.conf had the server keyword we had to choose different name here
+    build: 
+      dockerfile: Dockerfile.dev
+      context: ./server
+    volumes:
+      - /usr/app/node_modules
+      - ./server:/usr/app
+    environment:              # This creates environment variable at the runtime when the container is started(not when images are build)
+      - REDIS_HOST=redis      # While specifying the host name, we can directly use the service name mentioned in the docker-compose file
+      - REDIS_PORT=6379
+      - PGUSER=postgres
+      - PGHOST=postgres
+      - PGDATABASE=postgres
+      - PGPASSWORD=postgres_password
+      - PGPORT=5432
+  client:   # This is the react server actually
+    stdin_open: true
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./client
+    volumes:
+      - /usr/app/node_modules
+      - ./client:/usr/app
+    environment:
+      - WDS_SOCKET_PORT=443     # This has to be added here because of new react changes
+  worker:   # this calculates the fibonacci value
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./worker
+    volumes:
+      - /usr/app/node_modules
+      - ./worker:/usr/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+  nginx:
+    restart: always
+    depends_on:
+      - api
+      - client
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./nginx
+    ports:
+      - '3050:80'

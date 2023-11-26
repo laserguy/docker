@@ -1,0 +1,44 @@
+# This file has to be in the root directory of the repo
+
+sudo: required
+services:
+  - docker
+
+# We cannot use the production dockerfile for testing(not possible), therefore we have to use Dockerfile.dev
+
+# Right now we are only testing the react app, but if we want to add more we can copy the same line in before_install and in script construct
+# for others like client,worker etc.
+
+before_install:
+  - docker build -t mahtovivek741/react-test -f ./client/Dockerfile.dev ./client
+
+script:
+  - docker run -e CI=true mahtovivek741/react-test npm test
+
+after_success:
+  - docker build -t mahtovivek741/multi-client ./client
+  - docker build -t mahtovivek741/multi-nginx ./nginx
+  - docker build -t mahtovivek741/multi-server ./server
+  - docker build -t mahtovivek741/multi-worker ./worker
+  # Log in to the docker CLI
+  # Set the environment variable of DOCKER_PASSWORD and DOCKER_ID in travis, since we don't want to expose our username and password here, unless the github repo is private
+  # But in anycase you shouldn't expose your password.
+  # The below command will fetch DOCKER_PASSWORD from travis env variables and will pass that as stdin to docker login
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Push the images/tags to the dockerHUB
+  - docker push mahtovivek741/multi-client
+  - docker push mahtovivek741/multi-nginx
+  - docker push mahtovivek741/multi-server
+  - docker push mahtovivek741/multi-worker
+
+deploy:
+  provider: elasticbeanstalk
+  region: us-east-2
+  app: multi-container
+  env: Multicontainer-env
+  bucket_name: elasticbeanstalk-us-east-2-714047344597
+  bucket_path: docker-cont
+  on:
+    branch: master
+  access_key_id: $AWS_ACCESS_KEY
+  secret_access_key: $AWS_SECRET_KEY
